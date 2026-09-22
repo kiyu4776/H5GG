@@ -10,7 +10,8 @@
 
 
 #import <UIKit/UIKit.h>
- 
+#import <ImageIO/ImageIO.h>
+
 @interface FloatButton : UIImageView
 @property BOOL keepFront;
 @property BOOL keepWindow;
@@ -19,73 +20,75 @@
 @property void(^actionBlock)(void);
 
 -(void)setIcon:(UIImage*)image;
+-(void)setIconData:(NSData*)data;
 -(void)setAction:(void(^)(void))block;
 -(void)setLocation:(CGPoint*)point;
- 
+
 @end
 
 @implementation FloatButton
- 
+
 -(instancetype)init {
     self = [super initWithFrame:CGRectMake(20, 25, 50, 50)];
     if (self) {
-        
+
         self.clipsToBounds = YES;
-        self.layer.cornerRadius = self.frame.size.width / 2;
-        
-        self.alpha = 0.8;
+        self.layer.cornerRadius = self.frame.size.width / 3
+;
+
+        self.alpha =1.0 ;
         self.layer.zPosition = MAXFLOAT;
         self.backgroundColor = [UIColor redColor];
-        
+
         self.userInteractionEnabled = YES;
-        
+
         self.keepFront = YES;
         self.keepWindow = NO;
-        
+
         self.frontTimer = [NSTimer scheduledTimerWithTimeInterval:0.2 repeats:YES block:^(NSTimer*t){
             if(!self.hidden) {
-                
+
                 if(self.keepFront) [self.superview bringSubviewToFront:self];
-                
+
                 if(!self.keepWindow) {
                     UIWindow *window = [UIApplication sharedApplication].keyWindow;
                     if(self.superview != window) [window addSubview:self];
                 }
-                
+
                 CGRect newFrame = self.superview.frame;
                 static CGRect lastFrame = newFrame;
                 if(!CGRectEqualToRect(lastFrame, self.superview.frame)) {
-                    
+
                     float newX = newFrame.size.width * self.frame.origin.x/lastFrame.size.width;
                     float newY = newFrame.size.height * self.frame.origin.y/lastFrame.size.height;
 
                     if(newX<0) newX=0;
                     if((newX+self.frame.size.width) > newFrame.size.width)
                         newX = newFrame.size.width - self.frame.size.width;
-                    
+
                     if(newY<0) newY=0;
                     if((newY+self.frame.size.height) > newFrame.size.height)
                         newY = newFrame.size.height - self.frame.size.height;
 
                     self.frame = CGRectMake(newX, newY, self.frame.size.width, self.frame.size.height);
-                    
+
                     lastFrame = newFrame;
                 }
             }
         }];
-        
+
         UITapGestureRecognizer *tap=[[UITapGestureRecognizer alloc]initWithTarget:self action:@selector(tapMe)];
         [self addGestureRecognizer:tap];
     }
     return self;
 }
- 
+
 -(void)touchesBegan:(NSSet*)touches withEvent:(UIEvent*)event {
     CGPoint pt = [[touches anyObject] locationInView:self];
     self.startLocation = pt;
     [[self superview] bringSubviewToFront:self];
 }
- 
+
 -(void)touchesMoved:(NSSet*)touches withEvent:(UIEvent*)event {
     CGPoint pt = [[touches anyObject] locationInView:self];
     float dx = pt.x - self.startLocation.x;
@@ -116,14 +119,15 @@
 //    }
 }
  
+
 -(void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
 }
- 
+
 -(void)tapMe {
     NSLog(@"click FloatButton!");
     if(self.actionBlock){ _actionBlock(); }
 }
- 
+
 
 -(void)setAction:(void (^)(void))block {
     self.actionBlock = block;
@@ -133,7 +137,38 @@
     self.image = image;
     self.backgroundColor = [UIColor clearColor];
 }
- 
+
+-(void)setIconData:(NSData *)data {
+    if (data.length > 6) {
+        const char *b = (const char *)data.bytes;
+        if (strncmp(b, "GIF87a", 6) == 0 || strncmp(b, "GIF89a", 6) == 0) {
+            CGImageSourceRef src = CGImageSourceCreateWithData((__bridge CFDataRef)data, NULL);
+            size_t n = CGImageSourceGetCount(src);
+            NSMutableArray *imgs = [NSMutableArray arrayWithCapacity:n];
+            float dur = 0;
+            for (size_t i = 0; i < n; i++) {
+                CGImageRef cg = CGImageSourceCreateImageAtIndex(src, i, NULL);
+                [imgs addObject:[UIImage imageWithCGImage:cg]];
+                CGImageRelease(cg);
+                CFDictionaryRef p = CGImageSourceCopyPropertiesAtIndex(src, i, NULL);
+                CFDictionaryRef g = (CFDictionaryRef)CFDictionaryGetValue(p, kCGImagePropertyGIFDictionary);
+                NSNumber *d = (NSNumber *)CFDictionaryGetValue(g, kCGImagePropertyGIFUnclampedDelayTime);
+                if (!d || [d floatValue] == 0) d = (NSNumber *)CFDictionaryGetValue(g, kCGImagePropertyGIFDelayTime);
+                dur += [d floatValue];
+                if (p) CFRelease(p);
+            }
+            CFRelease(src);
+            self.animationImages = imgs;
+            self.animationDuration = dur > 0 ? dur : 0.1 * n;
+            self.animationRepeatCount = 0;
+            [self startAnimating];
+            self.backgroundColor = [UIColor clearColor];
+            return;
+        }
+    }
+    [self setIcon:[UIImage imageWithData:data]];
+}
+
 @end
 
 #endif /* FloatButton_h */

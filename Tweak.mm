@@ -64,7 +64,7 @@ GVData* PGVSharedData = &StaticGVSharedData;
 #include "h5gg.h"
 
 //嵌入图标文件
-INCBIN(Icon, "icon.png");
+INCBIN(Icon, "icon.gif");
 //嵌入菜单H5文件
 INCTXT(Menu, "Index.html");
 INCTXT(MenuEn, "Index-en.html");
@@ -503,11 +503,10 @@ void initFloatButton(void (^callback)(void))
     } else {
         //第三优先级: 从dylib加载图标
         NSData* iconData = [[NSData alloc] initWithBytes:gIconData length:gIconSize];
-        iconImage = [[UIImage alloc] initWithData:iconData];
+        [floatBtn setIconData:iconData];
+
     }
     
-    //设置悬浮按钮图标
-    [floatBtn setIcon:iconImage];
     
     //设置悬浮按钮点击处理, 点击时反转显示隐藏的状态
     [floatBtn setAction:callback];
